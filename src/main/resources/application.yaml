@@ -1,3 +1,18 @@
 spring:
   application:
     name: hotel-host-project-backend
+  # En local las variables salen del .env; en producción, de las variables de entorno del servidor
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      # Las tablas las crea Flyway (db/migration); Hibernate solo comprueba que coinciden
+      ddl-auto: validate
+    open-in-view: false
+
+server:
+  port: ${SERVER_PORT:8081}
