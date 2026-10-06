@@ -1,6 +1,5 @@
 package com.hotelhost.backend.config;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import javax.crypto.SecretKey;
@@ -11,7 +10,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -24,13 +22,15 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
+import com.hotelhost.backend.repository.UserRepository;
+import com.hotelhost.backend.security.ApiErrorWriter;
+import com.hotelhost.backend.security.PasswordChangeRequiredFilter;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * API sin sesión: cada petición debe llevar "Authorization: Bearer <token JWT>".
@@ -42,11 +42,11 @@ public class SecurityConfig {
 	private static final int MIN_SECRET_LENGTH = 32;
 
 	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	public SecurityFilterChain securityFilterChain(HttpSecurity http, UserRepository userRepository) throws Exception {
 		AuthenticationEntryPoint unauthorized = (request, response, ex) ->
-				writeError(response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Tienes que iniciar sesión");
+				ApiErrorWriter.write(response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Tienes que iniciar sesión");
 		AccessDeniedHandler forbidden = (request, response, ex) ->
-				writeError(response, HttpStatus.FORBIDDEN, "FORBIDDEN", "No tienes permiso para esta acción");
+				ApiErrorWriter.write(response, HttpStatus.FORBIDDEN, "FORBIDDEN", "No tienes permiso para esta acción");
 
 		http
 				.csrf(csrf -> csrf.disable())
@@ -62,7 +62,9 @@ public class SecurityConfig {
 						.accessDeniedHandler(forbidden))
 				.exceptionHandling(exceptions -> exceptions
 						.authenticationEntryPoint(unauthorized)
-						.accessDeniedHandler(forbidden));
+						.accessDeniedHandler(forbidden))
+				// Después de validar el token: bloquea a quien aún tiene la contraseña temporal
+				.addFilterAfter(new PasswordChangeRequiredFilter(userRepository), BearerTokenAuthenticationFilter.class);
 
 		return http.build();
 	}
@@ -99,14 +101,5 @@ public class SecurityConfig {
 		JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
 		converter.setJwtGrantedAuthoritiesConverter(authorities);
 		return converter;
-	}
-
-	// Mensajes fijos sin caracteres especiales de JSON, por eso se escriben directamente
-	private static void writeError(HttpServletResponse response, HttpStatus status, String code, String message)
-			throws IOException {
-		response.setStatus(status.value());
-		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-		response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-		response.getWriter().write("{\"error\":\"" + code + "\",\"message\":\"" + message + "\"}");
 	}
 }
