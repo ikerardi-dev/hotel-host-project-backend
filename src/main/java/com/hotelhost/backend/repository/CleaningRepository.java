@@ -20,6 +20,20 @@ public interface CleaningRepository extends JpaRepository<Cleaning, Long> {
 
 	List<Cleaning> findByCleaningDateAndStatus(LocalDate date, CleaningStatus status);
 
+	// Limpiezas de un empleado desde hoy, más las atrasadas sin terminar (sin las canceladas)
+	@Query("""
+			SELECT c FROM Cleaning c
+			JOIN FETCH c.apartment a
+			JOIN FETCH a.building
+			WHERE c.assignedTo.id = :userId
+			  AND c.status <> com.hotelhost.backend.entity.CleaningStatus.CANCELLED
+			  AND (c.cleaningDate >= :today
+			       OR c.status IN (com.hotelhost.backend.entity.CleaningStatus.PENDING,
+			                       com.hotelhost.backend.entity.CleaningStatus.IN_PROGRESS))
+			ORDER BY c.cleaningDate, c.startTime
+			""")
+	List<Cleaning> findCurrentByAssignedTo(@Param("userId") Long userId, @Param("today") LocalDate today);
+
 	// Al dar de baja a un empleado: sus limpiezas pendientes desde hoy se quedan sin asignar
 	@Modifying
 	@Query("""
