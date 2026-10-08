@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,6 +23,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.hotelhost.backend.entity.Apartment;
+import com.hotelhost.backend.entity.CleaningStatus;
 import com.hotelhost.backend.entity.User;
 import com.hotelhost.backend.entity.UserRole;
 import com.hotelhost.backend.repository.ApartmentRepository;
@@ -162,6 +165,76 @@ class BookingControllerTest {
 	}
 
 	@Test
+	void editingMovesThePendingCleaningToTheNewCheckOut() throws Exception {
+		Long id = createdId(createBooking("2030-05-10T16:00:00", "2030-05-14T11:00:00", 2,
+				"{\"startTime\": \"12:00\", \"endTime\": \"14:00\"}"));
+
+		updateBooking(id, "2030-05-10T16:00:00", "2030-05-16T11:00:00", 3)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.guests").value(3))
+				.andExpect(jsonPath("$.checkOut").value("2030-05-16T11:00:00"))
+				.andExpect(jsonPath("$.cleaning.date").value("2030-05-16"));
+	}
+
+	@Test
+	void editingDoesNotOverlapWithItselfButDoesWithOthers() throws Exception {
+		Long id = createdId(createBooking("2030-05-10T16:00:00", "2030-05-14T11:00:00", 2, NO_CLEANING));
+		createBooking("2030-05-20T16:00:00", "2030-05-22T11:00:00", 2, NO_CLEANING);
+
+		updateBooking(id, "2030-05-11T16:00:00", "2030-05-15T11:00:00", 2).andExpect(status().isOk());
+		updateBooking(id, "2030-05-11T16:00:00", "2030-05-21T11:00:00", 2)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").value("BOOKING_OVERLAP"));
+	}
+
+	@Test
+	void editingRespectsCapacity() throws Exception {
+		Long id = createdId(createBooking("2030-05-10T16:00:00", "2030-05-14T11:00:00", 2, NO_CLEANING));
+
+		updateBooking(id, "2030-05-10T16:00:00", "2030-05-14T11:00:00", 5)
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("CAPACITY_EXCEEDED"));
+	}
+
+	@Test
+	void cancellingAlsoCancelsThePendingCleaningAndFreesTheDates() throws Exception {
+		Long id = createdId(createBooking("2030-05-10T16:00:00", "2030-05-14T11:00:00", 2,
+				"{\"startTime\": \"12:00\", \"endTime\": \"14:00\"}"));
+
+		mockMvc.perform(patch("/api/bookings/" + id + "/cancel").header(HttpHeaders.AUTHORIZATION, adminToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("CANCELLED"))
+				.andExpect(jsonPath("$.cleaning").isEmpty());
+
+		var cleaning = cleaningRepository.findByBookingId(id).orElseThrow();
+		assertThat(cleaning.getStatus()).isEqualTo(CleaningStatus.CANCELLED);
+
+		// Las fechas vuelven a estar libres
+		createBooking("2030-05-10T16:00:00", "2030-05-14T11:00:00", 2, NO_CLEANING).andExpect(status().isCreated());
+	}
+
+	@Test
+	void cancelledBookingCannotBeEdited() throws Exception {
+		Long id = createdId(createBooking("2030-05-10T16:00:00", "2030-05-14T11:00:00", 2, NO_CLEANING));
+		mockMvc.perform(patch("/api/bookings/" + id + "/cancel").header(HttpHeaders.AUTHORIZATION, adminToken));
+
+		updateBooking(id, "2030-05-10T16:00:00", "2030-05-14T11:00:00", 2)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").value("BOOKING_CANCELLED"));
+	}
+
+	@Test
+	void availabilityCanExcludeTheBookingBeingEdited() throws Exception {
+		Long id = createdId(createBooking("2030-05-10T16:00:00", "2030-05-14T11:00:00", 2, NO_CLEANING));
+
+		mockMvc.perform(get("/api/apartments/availability")
+				.param("checkIn", "2030-05-11T16:00:00").param("checkOut", "2030-05-13T11:00:00")
+				.param("excludeBookingId", id.toString())
+				.header(HttpHeaders.AUTHORIZATION, adminToken))
+				.andExpect(jsonPath("$.unavailableApartmentIds", empty()));
+	}
+
+	@Test
 	void cleaningStaffCannotCreateBookings() throws Exception {
 		mockMvc.perform(post("/api/bookings")
 				.header(HttpHeaders.AUTHORIZATION, bearer("limpieza.test@hotelhost.local"))
@@ -190,6 +263,26 @@ class BookingControllerTest {
 				.header(HttpHeaders.AUTHORIZATION, adminToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body));
+	}
+
+	private ResultActions updateBooking(Long id, String checkIn, String checkOut, int guests) throws Exception {
+		String body = """
+				{
+				  "channel": "AIRBNB",
+				  "guestName": "Laura Gómez",
+				  "checkIn": "%s",
+				  "checkOut": "%s",
+				  "guests": %d
+				}
+				""".formatted(checkIn, checkOut, guests);
+		return mockMvc.perform(put("/api/bookings/" + id)
+				.header(HttpHeaders.AUTHORIZATION, adminToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body));
+	}
+
+	private Long createdId(ResultActions result) throws Exception {
+		return ((Number) JsonPath.read(result.andReturn().getResponse().getContentAsString(), "$.id")).longValue();
 	}
 
 	private ResultActions availability(String checkIn, String checkOut) throws Exception {

@@ -15,6 +15,7 @@ import com.hotelhost.backend.dto.AvailabilityResponse;
 import com.hotelhost.backend.dto.BookingResponse;
 import com.hotelhost.backend.dto.CreateBookingRequest;
 import com.hotelhost.backend.dto.CreateBookingRequest.CleaningPlan;
+import com.hotelhost.backend.dto.UpdateBookingRequest;
 import com.hotelhost.backend.entity.Apartment;
 import com.hotelhost.backend.entity.Booking;
 import com.hotelhost.backend.entity.BookingStatus;
@@ -59,22 +60,8 @@ public class BookingService {
 	 */
 	@Transactional
 	public BookingResponse create(CreateBookingRequest request) {
-		if (!request.checkOut().isAfter(request.checkIn())) {
-			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATES", "La salida debe ser posterior a la entrada");
-		}
-
-		// Bloquea el apartamento: otra reserva simultánea del mismo apartamento espera a que acabe esta
-		Apartment apartment = apartmentRepository.findByIdForUpdate(request.apartmentId())
-				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "APARTMENT_NOT_FOUND", "El apartamento no existe"));
-
-		if (request.guests() > apartment.getCapacity()) {
-			throw new ApiException(HttpStatus.BAD_REQUEST, "CAPACITY_EXCEEDED",
-					"El apartamento tiene " + apartment.getCapacity() + " plazas como máximo");
-		}
-		if (bookingRepository.existsOverlapping(apartment.getId(), request.checkIn(), request.checkOut())) {
-			throw new ApiException(HttpStatus.CONFLICT, "BOOKING_OVERLAP",
-					"Las fechas se solapan con otra reserva de este apartamento");
-		}
+		Apartment apartment = lockAndValidate(request.apartmentId(), request.guests(), request.checkIn(),
+				request.checkOut(), null);
 
 		Booking booking = new Booking();
 		booking.setApartment(apartment);
@@ -92,6 +79,85 @@ public class BookingService {
 		Cleaning cleaning = request.cleaning() == null ? null : scheduleCleaning(booking, request.cleaning());
 
 		return BookingResponse.from(booking, cleaning);
+	}
+
+	/**
+	 * Mismas validaciones que al crear. Si cambia la salida, la limpieza pendiente se mueve a la nueva fecha.
+	 */
+	@Transactional
+	public BookingResponse update(Long id, UpdateBookingRequest request) {
+		Booking booking = findActiveBooking(id);
+		lockAndValidate(booking.getApartment().getId(), request.guests(), request.checkIn(), request.checkOut(), id);
+
+		booking.setChannel(request.channel());
+		booking.setGuestName(request.guestName().trim());
+		booking.setGuestPhone(blankToNull(request.guestPhone()));
+		booking.setGuestEmail(blankToNull(request.guestEmail()));
+		booking.setReference(blankToNull(request.reference()));
+		booking.setCheckIn(request.checkIn());
+		booking.setCheckOut(request.checkOut());
+		booking.setGuests(request.guests());
+		booking.setNotes(blankToNull(request.notes()));
+
+		Cleaning cleaning = activeCleaningOf(booking);
+		if (cleaning != null && cleaning.getStatus() == CleaningStatus.PENDING) {
+			cleaning.setCleaningDate(request.checkOut().toLocalDate());
+		}
+		return BookingResponse.from(booking, cleaning);
+	}
+
+	/**
+	 * La reserva no se borra: se marca como cancelada, y su limpieza pendiente también se cancela.
+	 */
+	@Transactional
+	public BookingResponse cancel(Long id) {
+		Booking booking = findActiveBooking(id);
+		booking.setStatus(BookingStatus.CANCELLED);
+
+		Cleaning cleaning = activeCleaningOf(booking);
+		if (cleaning != null && cleaning.getStatus() == CleaningStatus.PENDING) {
+			cleaning.setStatus(CleaningStatus.CANCELLED);
+		}
+		return BookingResponse.from(booking, activeCleaningOf(booking));
+	}
+
+	/**
+	 * Bloquea el apartamento (otra reserva simultánea del mismo apartamento espera a que acabe esta transacción)
+	 * y comprueba fechas, plazas y solapamiento. excludeBookingId: la reserva que se edita (null al crear).
+	 */
+	private Apartment lockAndValidate(
+			Long apartmentId, int guests, LocalDateTime checkIn, LocalDateTime checkOut, Long excludeBookingId) {
+		if (!checkOut.isAfter(checkIn)) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATES", "La salida debe ser posterior a la entrada");
+		}
+
+		Apartment apartment = apartmentRepository.findByIdForUpdate(apartmentId)
+				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "APARTMENT_NOT_FOUND", "El apartamento no existe"));
+
+		if (guests > apartment.getCapacity()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "CAPACITY_EXCEEDED",
+					"El apartamento tiene " + apartment.getCapacity() + " plazas como máximo");
+		}
+		if (bookingRepository.existsOverlapping(apartment.getId(), checkIn, checkOut, excludeBookingId)) {
+			throw new ApiException(HttpStatus.CONFLICT, "BOOKING_OVERLAP",
+					"Las fechas se solapan con otra reserva de este apartamento");
+		}
+		return apartment;
+	}
+
+	private Booking findActiveBooking(Long id) {
+		Booking booking = bookingRepository.findById(id)
+				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND", "La reserva no existe"));
+		if (booking.getStatus() == BookingStatus.CANCELLED) {
+			throw new ApiException(HttpStatus.CONFLICT, "BOOKING_CANCELLED", "La reserva está cancelada");
+		}
+		return booking;
+	}
+
+	private Cleaning activeCleaningOf(Booking booking) {
+		return cleaningRepository.findByBookingId(booking.getId())
+				.filter(cleaning -> cleaning.getStatus() != CleaningStatus.CANCELLED)
+				.orElse(null);
 	}
 
 	// Calendario del apartamento: reservas activas que tocan el periodo, cada una con su limpieza
@@ -113,11 +179,13 @@ public class BookingService {
 	}
 
 	@Transactional(readOnly = true)
-	public AvailabilityResponse availability(LocalDateTime checkIn, LocalDateTime checkOut) {
+	// excludeBookingId: al editar, la propia reserva no cuenta como ocupación
+	public AvailabilityResponse availability(LocalDateTime checkIn, LocalDateTime checkOut, Long excludeBookingId) {
 		if (!checkOut.isAfter(checkIn)) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATES", "La salida debe ser posterior a la entrada");
 		}
-		return new AvailabilityResponse(bookingRepository.findApartmentIdsWithOverlapping(checkIn, checkOut));
+		return new AvailabilityResponse(
+				bookingRepository.findApartmentIdsWithOverlapping(checkIn, checkOut, excludeBookingId));
 	}
 
 	private Cleaning scheduleCleaning(Booking booking, CleaningPlan plan) {

@@ -3,6 +3,7 @@ package com.hotelhost.backend.repository;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -21,6 +22,8 @@ public interface CleaningRepository extends JpaRepository<Cleaning, Long> {
 	List<Cleaning> findByCleaningDateAndStatus(LocalDate date, CleaningStatus status);
 
 	List<Cleaning> findByBookingIdIn(Collection<Long> bookingIds);
+
+	Optional<Cleaning> findByBookingId(Long bookingId);
 
 	List<Cleaning> findByApartmentIdAndCleaningDateBetweenAndStatusNotOrderByCleaningDateAscStartTimeAsc(
 			Long apartmentId, LocalDate from, LocalDate to, CleaningStatus excludedStatus);

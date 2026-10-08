@@ -45,8 +45,12 @@ public class ApartmentController {
 
 	// Ejemplo: /api/apartments/availability?checkIn=2026-10-20T16:00:00&checkOut=2026-10-25T11:00:00
 	@GetMapping("/availability")
-	public AvailabilityResponse availability(@RequestParam LocalDateTime checkIn, @RequestParam LocalDateTime checkOut) {
-		return bookingService.availability(checkIn, checkOut);
+	// excludeBookingId (opcional): al editar una reserva, para que no cuente como ocupación
+	public AvailabilityResponse availability(
+			@RequestParam LocalDateTime checkIn,
+			@RequestParam LocalDateTime checkOut,
+			@RequestParam(required = false) Long excludeBookingId) {
+		return bookingService.availability(checkIn, checkOut, excludeBookingId);
 	}
 
 	@GetMapping("/{id}")
