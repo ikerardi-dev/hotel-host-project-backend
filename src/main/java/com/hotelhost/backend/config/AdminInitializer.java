@@ -14,7 +14,8 @@ import com.hotelhost.backend.repository.UserRepository;
 
 /**
  * Crea el administrador inicial al arrancar, solo si todavía no existe ninguno.
- * Sus datos salen de ADMIN_EMAIL y ADMIN_PASSWORD; deberá cambiar la contraseña en el primer acceso.
+ * Sus datos salen de ADMIN_EMAIL y ADMIN_PASSWORD. Los administradores no pasan por el cambio obligatorio
+ * de contraseña (solo los empleados con contraseña temporal).
  */
 @Component
 public class AdminInitializer implements ApplicationRunner {
@@ -53,7 +54,7 @@ public class AdminInitializer implements ApplicationRunner {
 		admin.setFirstName("Administrador");
 		admin.setLastName("");
 		admin.setRole(UserRole.ADMIN);
-		admin.setMustChangePassword(true);
+		admin.setMustChangePassword(false);
 		userRepository.save(admin);
 
 		log.info("Administrador inicial creado: {}", admin.getEmail());
