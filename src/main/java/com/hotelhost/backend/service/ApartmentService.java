@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ import com.hotelhost.backend.entity.Booking;
 import com.hotelhost.backend.entity.BookingStatus;
 import com.hotelhost.backend.entity.Cleaning;
 import com.hotelhost.backend.entity.CleaningStatus;
+import com.hotelhost.backend.exception.ApiException;
 import com.hotelhost.backend.repository.ApartmentRepository;
 import com.hotelhost.backend.repository.BookingRepository;
 import com.hotelhost.backend.repository.CleaningRepository;
@@ -63,6 +65,15 @@ public class ApartmentService {
 				.map(apartment -> toResponse(apartment, bookingsByApartment.getOrDefault(apartment.getId(), List.of()),
 						pendingCleaning, cleanedToday, now))
 				.toList();
+	}
+
+	// Son pocos apartamentos: se reutiliza el cálculo de estado de la lista completa
+	@Transactional(readOnly = true)
+	public ApartmentResponse findById(Long id) {
+		return findAll().stream()
+				.filter(apartment -> apartment.id().equals(id))
+				.findFirst()
+				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "APARTMENT_NOT_FOUND", "El apartamento no existe"));
 	}
 
 	private ApartmentResponse toResponse(

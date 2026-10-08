@@ -1,7 +1,11 @@
 package com.hotelhost.backend.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -13,8 +17,10 @@ import com.hotelhost.backend.dto.CreateBookingRequest;
 import com.hotelhost.backend.dto.CreateBookingRequest.CleaningPlan;
 import com.hotelhost.backend.entity.Apartment;
 import com.hotelhost.backend.entity.Booking;
+import com.hotelhost.backend.entity.BookingStatus;
 import com.hotelhost.backend.entity.Cleaning;
 import com.hotelhost.backend.entity.CleaningChecklistItem;
+import com.hotelhost.backend.entity.CleaningStatus;
 import com.hotelhost.backend.exception.ApiException;
 import com.hotelhost.backend.repository.ApartmentRepository;
 import com.hotelhost.backend.repository.BookingRepository;
@@ -86,6 +92,24 @@ public class BookingService {
 		Cleaning cleaning = request.cleaning() == null ? null : scheduleCleaning(booking, request.cleaning());
 
 		return BookingResponse.from(booking, cleaning);
+	}
+
+	// Calendario del apartamento: reservas activas que tocan el periodo, cada una con su limpieza
+	@Transactional(readOnly = true)
+	public List<BookingResponse> findByApartment(Long apartmentId, LocalDate from, LocalDate to) {
+		DateRanges.validate(from, to);
+		List<Booking> bookings = bookingRepository
+				.findByApartmentIdAndStatusAndCheckInLessThanAndCheckOutGreaterThanOrderByCheckInAsc(
+						apartmentId, BookingStatus.ACTIVE, to.plusDays(1).atStartOfDay(), from.atStartOfDay());
+
+		Map<Long, Cleaning> cleaningByBooking = cleaningRepository
+				.findByBookingIdIn(bookings.stream().map(Booking::getId).toList()).stream()
+				.filter(cleaning -> cleaning.getStatus() != CleaningStatus.CANCELLED)
+				.collect(Collectors.toMap(cleaning -> cleaning.getBooking().getId(), Function.identity()));
+
+		return bookings.stream()
+				.map(booking -> BookingResponse.from(booking, cleaningByBooking.get(booking.getId())))
+				.toList();
 	}
 
 	@Transactional(readOnly = true)

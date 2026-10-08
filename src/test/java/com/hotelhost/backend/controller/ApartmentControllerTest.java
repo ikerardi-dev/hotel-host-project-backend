@@ -114,6 +114,40 @@ class ApartmentControllerTest {
 	}
 
 	@Test
+	void findsOneApartmentById() throws Exception {
+		mockMvc.perform(get("/api/apartments/" + legazpiA.getId())
+				.header(HttpHeaders.AUTHORIZATION, bearer("admin.test@hotelhost.local")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.code").value("A"))
+				.andExpect(jsonPath("$.building.name").value("Legazpi"));
+	}
+
+	@Test
+	void calendarReturnsBookingsTouchingThePeriodWithTheirCleaning() throws Exception {
+		Booking inside = bookingRepository.save(booking("Dentro", LocalDateTime.of(2030, 5, 10, 16, 0), LocalDateTime.of(2030, 5, 14, 11, 0)));
+		bookingRepository.save(booking("Fuera", LocalDateTime.of(2030, 7, 1, 16, 0), LocalDateTime.of(2030, 7, 3, 11, 0)));
+		Cleaning cleaning = cleaning(CleaningStatus.PENDING);
+		cleaning.setBooking(inside);
+		cleaning.setCleaningDate(LocalDate.of(2030, 5, 14));
+		cleaningRepository.save(cleaning);
+
+		mockMvc.perform(get("/api/apartments/" + legazpiA.getId() + "/bookings")
+				.param("from", "2030-05-01").param("to", "2030-05-31")
+				.header(HttpHeaders.AUTHORIZATION, bearer("admin.test@hotelhost.local")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(1))
+				.andExpect(jsonPath("$[0].guestName").value("Dentro"))
+				.andExpect(jsonPath("$[0].cleaning.date").value("2030-05-14"));
+
+		mockMvc.perform(get("/api/apartments/" + legazpiA.getId() + "/cleanings")
+				.param("from", "2030-05-01").param("to", "2030-05-31")
+				.header(HttpHeaders.AUTHORIZATION, bearer("admin.test@hotelhost.local")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.length()").value(1))
+				.andExpect(jsonPath("$[0].date").value("2030-05-14"));
+	}
+
+	@Test
 	void cleaningStaffCannotSeeApartments() throws Exception {
 		mockMvc.perform(get("/api/apartments").header(HttpHeaders.AUTHORIZATION, bearer("limpieza.test@hotelhost.local")))
 				.andExpect(status().isForbidden());

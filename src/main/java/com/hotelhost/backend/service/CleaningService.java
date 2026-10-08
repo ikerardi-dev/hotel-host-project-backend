@@ -2,7 +2,6 @@ package com.hotelhost.backend.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -27,8 +26,6 @@ import com.hotelhost.backend.security.CurrentUser;
 @Service
 public class CleaningService {
 
-	private static final int MAX_SEARCH_DAYS = 62;
-
 	private final CleaningRepository cleaningRepository;
 	private final BookingRepository bookingRepository;
 	private final EmployeeService employeeService;
@@ -43,7 +40,7 @@ public class CleaningService {
 	}
 
 	/**
-	 * Control del admin: limpiezas de un periodo (máximo 62 días) con filtros opcionales.
+	 * Control del admin: limpiezas de un periodo con filtros opcionales.
 	 */
 	@Transactional(readOnly = true)
 	public List<CleaningResponse> search(
@@ -53,11 +50,20 @@ public class CleaningService {
 			Long buildingId,
 			Long employeeId,
 			boolean unassigned) {
-		if (to.isBefore(from) || ChronoUnit.DAYS.between(from, to) > MAX_SEARCH_DAYS) {
-			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
-					"El periodo debe ser de " + MAX_SEARCH_DAYS + " días como máximo y la fecha final no puede ser anterior");
-		}
+		DateRanges.validate(from, to);
 		return cleaningRepository.search(from, to, status, buildingId, employeeId, unassigned).stream()
+				.map(this::toResponse)
+				.toList();
+	}
+
+	// Calendario del apartamento: sus limpiezas del periodo, sin las canceladas
+	@Transactional(readOnly = true)
+	public List<CleaningResponse> findByApartment(Long apartmentId, LocalDate from, LocalDate to) {
+		DateRanges.validate(from, to);
+		return cleaningRepository
+				.findByApartmentIdAndCleaningDateBetweenAndStatusNotOrderByCleaningDateAscStartTimeAsc(
+						apartmentId, from, to, CleaningStatus.CANCELLED)
+				.stream()
 				.map(this::toResponse)
 				.toList();
 	}
