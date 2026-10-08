@@ -94,6 +94,15 @@ public class EmployeeService {
 		return new EmployeeStatusResponse(toResponse(employee), unassignedCleanings);
 	}
 
+	// Empleado al que se puede asignar una limpieza: de limpieza y activo
+	@Transactional(readOnly = true)
+	public User findActiveCleaner(Long id) {
+		return userRepository.findByIdAndRole(id, UserRole.CLEANING)
+				.filter(User::isActive)
+				.orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CLEANER",
+						"El empleado asignado no existe o está dado de baja"));
+	}
+
 	private Set<Building> findBuildings(Set<Long> ids) {
 		List<Building> buildings = buildingRepository.findAllById(ids);
 		if (buildings.size() != ids.size()) {

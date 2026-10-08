@@ -34,6 +34,27 @@ public interface CleaningRepository extends JpaRepository<Cleaning, Long> {
 			""")
 	List<Cleaning> findCurrentByAssignedTo(@Param("userId") Long userId, @Param("today") LocalDate today);
 
+	// Control del admin: limpiezas de un periodo con filtros opcionales (null = sin filtrar)
+	@Query("""
+			SELECT c FROM Cleaning c
+			JOIN FETCH c.apartment a
+			JOIN FETCH a.building b
+			LEFT JOIN FETCH c.assignedTo u
+			WHERE c.cleaningDate BETWEEN :from AND :to
+			  AND (:status IS NULL OR c.status = :status)
+			  AND (:buildingId IS NULL OR b.id = :buildingId)
+			  AND (:employeeId IS NULL OR u.id = :employeeId)
+			  AND (:unassigned = FALSE OR u IS NULL)
+			ORDER BY c.cleaningDate, c.startTime
+			""")
+	List<Cleaning> search(
+			@Param("from") LocalDate from,
+			@Param("to") LocalDate to,
+			@Param("status") CleaningStatus status,
+			@Param("buildingId") Long buildingId,
+			@Param("employeeId") Long employeeId,
+			@Param("unassigned") boolean unassigned);
+
 	// Al dar de baja a un empleado: sus limpiezas pendientes desde hoy se quedan sin asignar
 	@Modifying
 	@Query("""

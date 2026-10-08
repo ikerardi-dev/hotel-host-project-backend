@@ -15,13 +15,10 @@ import com.hotelhost.backend.entity.Apartment;
 import com.hotelhost.backend.entity.Booking;
 import com.hotelhost.backend.entity.Cleaning;
 import com.hotelhost.backend.entity.CleaningChecklistItem;
-import com.hotelhost.backend.entity.User;
-import com.hotelhost.backend.entity.UserRole;
 import com.hotelhost.backend.exception.ApiException;
 import com.hotelhost.backend.repository.ApartmentRepository;
 import com.hotelhost.backend.repository.BookingRepository;
 import com.hotelhost.backend.repository.CleaningRepository;
-import com.hotelhost.backend.repository.UserRepository;
 
 @Service
 public class BookingService {
@@ -38,17 +35,17 @@ public class BookingService {
 	private final BookingRepository bookingRepository;
 	private final ApartmentRepository apartmentRepository;
 	private final CleaningRepository cleaningRepository;
-	private final UserRepository userRepository;
+	private final EmployeeService employeeService;
 
 	public BookingService(
 			BookingRepository bookingRepository,
 			ApartmentRepository apartmentRepository,
 			CleaningRepository cleaningRepository,
-			UserRepository userRepository) {
+			EmployeeService employeeService) {
 		this.bookingRepository = bookingRepository;
 		this.apartmentRepository = apartmentRepository;
 		this.cleaningRepository = cleaningRepository;
-		this.userRepository = userRepository;
+		this.employeeService = employeeService;
 	}
 
 	/**
@@ -106,19 +103,12 @@ public class BookingService {
 		cleaning.setCleaningDate(booking.getCheckOut().toLocalDate());
 		cleaning.setStartTime(plan.startTime());
 		cleaning.setEndTime(plan.endTime());
-		cleaning.setAssignedTo(plan.cleanerId() == null ? null : findActiveCleaner(plan.cleanerId()));
+		cleaning.setAssignedTo(plan.cleanerId() == null ? null : employeeService.findActiveCleaner(plan.cleanerId()));
 
 		for (int i = 0; i < DEFAULT_CHECKLIST.size(); i++) {
 			cleaning.addChecklistItem(new CleaningChecklistItem(DEFAULT_CHECKLIST.get(i), i + 1));
 		}
 		return cleaningRepository.save(cleaning);
-	}
-
-	private User findActiveCleaner(Long id) {
-		return userRepository.findByIdAndRole(id, UserRole.CLEANING)
-				.filter(User::isActive)
-				.orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_CLEANER",
-						"El empleado asignado no existe o está dado de baja"));
 	}
 
 	private static String blankToNull(String value) {

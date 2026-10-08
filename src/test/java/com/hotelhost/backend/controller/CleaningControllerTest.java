@@ -150,6 +150,75 @@ class CleaningControllerTest {
 				.andExpect(jsonPath("$.incidentNotes").value("Mando del aire sin pilas"));
 	}
 
+	@Test
+	void adminSearchesCleaningsWithFilters() throws Exception {
+		Cleaning unassigned = cleaningRepository.save(cleaning(null, LocalDate.now(), CleaningStatus.PENDING));
+		String today = LocalDate.now().toString();
+
+		mockMvc.perform(get("/api/cleanings").param("from", today).param("to", today)
+				.header(HttpHeaders.AUTHORIZATION, bearer(ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[*].id", hasItem(todayCleaning.getId().intValue())))
+				.andExpect(jsonPath("$[*].id", hasItem(unassigned.getId().intValue())));
+
+		mockMvc.perform(get("/api/cleanings").param("from", today).param("to", today).param("unassigned", "true")
+				.header(HttpHeaders.AUTHORIZATION, bearer(ADMIN)))
+				.andExpect(jsonPath("$[*].id", hasItem(unassigned.getId().intValue())))
+				.andExpect(jsonPath("$[*].id", not(hasItem(todayCleaning.getId().intValue()))));
+
+		mockMvc.perform(get("/api/cleanings").param("from", today).param("to", today)
+				.param("employeeId", maria.getId().toString())
+				.header(HttpHeaders.AUTHORIZATION, bearer(ADMIN)))
+				.andExpect(jsonPath("$[*].id", not(hasItem(unassigned.getId().intValue()))));
+	}
+
+	@Test
+	void searchRejectsTooLongPeriods() throws Exception {
+		mockMvc.perform(get("/api/cleanings").param("from", "2030-01-01").param("to", "2030-06-01")
+				.header(HttpHeaders.AUTHORIZATION, bearer(ADMIN)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("INVALID_DATE_RANGE"));
+	}
+
+	@Test
+	void employeeCannotSearchOrReassignCleanings() throws Exception {
+		String today = LocalDate.now().toString();
+		mockMvc.perform(get("/api/cleanings").param("from", today).param("to", today)
+				.header(HttpHeaders.AUTHORIZATION, bearer(MARIA)))
+				.andExpect(status().isForbidden());
+		reassign(MARIA, null).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void adminReassignsAPendingCleaning() throws Exception {
+		Long javierId = userRepository.findByEmailIgnoreCase(JAVIER).orElseThrow().getId();
+
+		reassign(ADMIN, javierId)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.assignedTo.id").value(javierId))
+				.andExpect(jsonPath("$.startTime").value("10:00:00"));
+
+		reassign(ADMIN, null)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.assignedTo").isEmpty());
+	}
+
+	@Test
+	void startedCleaningCannotBeReassigned() throws Exception {
+		updateStatus(MARIA, "IN_PROGRESS");
+
+		reassign(ADMIN, null)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").value("CLEANING_NOT_EDITABLE"));
+	}
+
+	private ResultActions reassign(String email, Long cleanerId) throws Exception {
+		return mockMvc.perform(patch("/api/cleanings/" + todayCleaning.getId())
+				.header(HttpHeaders.AUTHORIZATION, bearer(email))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"cleanerId\": " + cleanerId + ", \"startTime\": \"10:00\", \"endTime\": \"12:00\"}"));
+	}
+
 	private ResultActions updateStatus(String email, String newStatus) throws Exception {
 		return mockMvc.perform(patch("/api/cleanings/" + todayCleaning.getId() + "/status")
 				.header(HttpHeaders.AUTHORIZATION, bearer(email))

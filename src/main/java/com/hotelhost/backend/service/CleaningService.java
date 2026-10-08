@@ -2,6 +2,7 @@ package com.hotelhost.backend.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.hotelhost.backend.dto.CleaningResponse;
+import com.hotelhost.backend.dto.UpdateCleaningRequest;
 import com.hotelhost.backend.entity.Booking;
 import com.hotelhost.backend.entity.BookingStatus;
 import com.hotelhost.backend.entity.Cleaning;
@@ -25,12 +27,57 @@ import com.hotelhost.backend.security.CurrentUser;
 @Service
 public class CleaningService {
 
+	private static final int MAX_SEARCH_DAYS = 62;
+
 	private final CleaningRepository cleaningRepository;
 	private final BookingRepository bookingRepository;
+	private final EmployeeService employeeService;
 
-	public CleaningService(CleaningRepository cleaningRepository, BookingRepository bookingRepository) {
+	public CleaningService(
+			CleaningRepository cleaningRepository,
+			BookingRepository bookingRepository,
+			EmployeeService employeeService) {
 		this.cleaningRepository = cleaningRepository;
 		this.bookingRepository = bookingRepository;
+		this.employeeService = employeeService;
+	}
+
+	/**
+	 * Control del admin: limpiezas de un periodo (máximo 62 días) con filtros opcionales.
+	 */
+	@Transactional(readOnly = true)
+	public List<CleaningResponse> search(
+			LocalDate from,
+			LocalDate to,
+			CleaningStatus status,
+			Long buildingId,
+			Long employeeId,
+			boolean unassigned) {
+		if (to.isBefore(from) || ChronoUnit.DAYS.between(from, to) > MAX_SEARCH_DAYS) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
+					"El periodo debe ser de " + MAX_SEARCH_DAYS + " días como máximo y la fecha final no puede ser anterior");
+		}
+		return cleaningRepository.search(from, to, status, buildingId, employeeId, unassigned).stream()
+				.map(this::toResponse)
+				.toList();
+	}
+
+	/**
+	 * El admin reasigna el empleado (o la deja sin asignar) y cambia la franja de una limpieza pendiente.
+	 */
+	@Transactional
+	public CleaningResponse update(Long id, UpdateCleaningRequest request) {
+		Cleaning cleaning = cleaningRepository.findById(id)
+				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "CLEANING_NOT_FOUND", "La limpieza no existe"));
+		if (cleaning.getStatus() != CleaningStatus.PENDING) {
+			throw new ApiException(HttpStatus.CONFLICT, "CLEANING_NOT_EDITABLE",
+					"Solo se pueden reasignar las limpiezas pendientes");
+		}
+
+		cleaning.setAssignedTo(request.cleanerId() == null ? null : employeeService.findActiveCleaner(request.cleanerId()));
+		cleaning.setStartTime(request.startTime());
+		cleaning.setEndTime(request.endTime());
+		return toResponse(cleaning);
 	}
 
 	@Transactional(readOnly = true)

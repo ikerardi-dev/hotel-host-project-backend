@@ -13,6 +13,9 @@ spring:
       # Las tablas las crea Flyway (db/migration); Hibernate solo comprueba que coinciden
       ddl-auto: validate
     open-in-view: false
+    properties:
+      # Carga en bloque las relaciones LAZY (camas, checklist...) de muchas entidades a la vez, en vez de una consulta por cada una
+      hibernate.default_batch_fetch_size: 50
 
 server:
   port: ${SERVER_PORT:8081}
