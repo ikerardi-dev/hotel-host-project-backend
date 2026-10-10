@@ -28,6 +28,20 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 	List<Booking> findByApartmentIdAndStatusAndCheckInLessThanAndCheckOutGreaterThanOrderByCheckInAsc(
 			Long apartmentId, BookingStatus status, LocalDateTime to, LocalDateTime from);
 
+	// Planning: reservas activas de un edificio que tocan un periodo [from, to)
+	@Query("""
+			SELECT b FROM Booking b
+			WHERE b.apartment.building.id = :buildingId
+			  AND b.status = com.hotelhost.backend.entity.BookingStatus.ACTIVE
+			  AND b.checkIn < :to
+			  AND b.checkOut > :from
+			ORDER BY b.checkIn
+			""")
+	List<Booking> findActiveInBuilding(
+			@Param("buildingId") Long buildingId,
+			@Param("from") LocalDateTime from,
+			@Param("to") LocalDateTime to);
+
 	// Reservas en curso o futuras (aún no han salido)
 	List<Booking> findByStatusAndCheckOutAfterOrderByCheckInAsc(BookingStatus status, LocalDateTime moment);
 

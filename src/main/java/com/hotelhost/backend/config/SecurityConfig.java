@@ -55,7 +55,8 @@ public class SecurityConfig {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
 						.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-						.requestMatchers("/api/employees/**", "/api/apartments/**", "/api/bookings/**", "/api/dashboard/**")
+						.requestMatchers("/api/employees/**", "/api/apartments/**", "/api/bookings/**", "/api/dashboard/**",
+								"/api/occupancy/**")
 								.hasRole("ADMIN")
 						// Lista completa y reasignación de limpiezas: solo admin (el detalle y el trabajo diario, ambos roles)
 						.requestMatchers(HttpMethod.GET, "/api/cleanings").hasRole("ADMIN")

@@ -23,6 +23,8 @@ public interface ApartmentRepository extends JpaRepository<Apartment, Long> {
 			""")
 	List<Apartment> findAllWithBuildingAndBeds();
 
+	List<Apartment> findByBuildingIdOrderByCode(Long buildingId);
+
 	// Bloquea la fila del apartamento hasta el final de la transacción (SELECT ... FOR UPDATE):
 	// dos reservas simultáneas del mismo apartamento se comprueban de una en una
 	@Lock(LockModeType.PESSIMISTIC_WRITE)

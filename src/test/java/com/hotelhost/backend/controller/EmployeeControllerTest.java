@@ -38,6 +38,8 @@ import com.jayway.jsonpath.JsonPath;
 class EmployeeControllerTest {
 
 	private static final String PASSWORD = "Secreta123";
+	// NIE ficticio, para no chocar con empleados reales de la base de datos
+	private static final String TEST_DNI = "X0000000T";
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -68,7 +70,7 @@ class EmployeeControllerTest {
 
 	@Test
 	void adminCreatesEmployeeWithTemporaryPassword() throws Exception {
-		createEmployee(adminToken(), "lucia.test@hotelhost.local", "48291044M")
+		createEmployee(adminToken(), "lucia.test@hotelhost.local", TEST_DNI)
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.email").value("lucia.test@hotelhost.local"))
 				.andExpect(jsonPath("$.active").value(true))
@@ -83,7 +85,7 @@ class EmployeeControllerTest {
 
 	@Test
 	void duplicatedEmailIsRejected() throws Exception {
-		createEmployee(adminToken(), "limpieza.test@hotelhost.local", "48291044M")
+		createEmployee(adminToken(), "limpieza.test@hotelhost.local", TEST_DNI)
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.error").value("EMAIL_ALREADY_EXISTS"));
 	}

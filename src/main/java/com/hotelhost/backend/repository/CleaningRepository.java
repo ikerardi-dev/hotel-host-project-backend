@@ -27,6 +27,9 @@ public interface CleaningRepository extends JpaRepository<Cleaning, Long> {
 
 	List<Cleaning> findByCleaningDateAndStatusNot(LocalDate date, CleaningStatus excludedStatus);
 
+	List<Cleaning> findByApartmentBuildingIdAndCleaningDateBetweenAndStatusNot(
+			Long buildingId, LocalDate from, LocalDate to, CleaningStatus excludedStatus);
+
 	List<Cleaning> findByApartmentIdAndCleaningDateBetweenAndStatusNotOrderByCleaningDateAscStartTimeAsc(
 			Long apartmentId, LocalDate from, LocalDate to, CleaningStatus excludedStatus);
 
