@@ -17,6 +17,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 	Optional<Booking> findFirstByApartmentIdAndStatusAndCheckInGreaterThanEqualOrderByCheckInAsc(
 			Long apartmentId, BookingStatus status, LocalDateTime from);
 
+	// Entradas y salidas de un día: momento entre [start, end)
+	List<Booking> findByStatusAndCheckInGreaterThanEqualAndCheckInLessThan(
+			BookingStatus status, LocalDateTime start, LocalDateTime end);
+
+	List<Booking> findByStatusAndCheckOutGreaterThanEqualAndCheckOutLessThan(
+			BookingStatus status, LocalDateTime start, LocalDateTime end);
+
 	// Reservas de un apartamento que tocan un periodo [from, to)
 	List<Booking> findByApartmentIdAndStatusAndCheckInLessThanAndCheckOutGreaterThanOrderByCheckInAsc(
 			Long apartmentId, BookingStatus status, LocalDateTime to, LocalDateTime from);
