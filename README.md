@@ -84,6 +84,8 @@ controller  →  service  →  repository  →  MySQL
 { "error": "BOOKING_OVERLAP", "message": "Las fechas se solapan con otra reserva de este apartamento" }
 ```
 
+Diagrama de clases (entidades, capas y núcleo de reservas y limpiezas) en [docs/diagrama-clases.md](docs/diagrama-clases.md).
+
 El contrato de la API (rutas, JSON en camelCase, fechas ISO 8601 y formato de error) está pensado para poder reimplementar el backend en PHP/Laravel sin cambiar el frontend.
 
 ---
