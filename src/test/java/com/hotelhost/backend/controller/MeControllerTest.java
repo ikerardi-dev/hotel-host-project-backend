@@ -94,6 +94,29 @@ class MeControllerTest {
 		login(REGULAR_EMAIL, NEW_PASSWORD).andExpect(status().isOk());
 	}
 
+	@Test
+	void userUpdatesOwnProfileButNotTheEmail() throws Exception {
+		mockMvc.perform(put("/api/me")
+				.header(HttpHeaders.AUTHORIZATION, bearer(REGULAR_EMAIL, PASSWORD))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"firstName\": \"Carlos\", \"lastName\": \"Ruiz García\", \"phone\": \"612890123\", \"email\": \"otro@hotelhost.local\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.firstName").value("Carlos"))
+				.andExpect(jsonPath("$.lastName").value("Ruiz García"))
+				.andExpect(jsonPath("$.phone").value("612890123"))
+				.andExpect(jsonPath("$.email").value(REGULAR_EMAIL));
+	}
+
+	@Test
+	void profileRequiresTheFirstName() throws Exception {
+		mockMvc.perform(put("/api/me")
+				.header(HttpHeaders.AUTHORIZATION, bearer(REGULAR_EMAIL, PASSWORD))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"firstName\": \"\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+	}
+
 	private ResultActions changePassword(String authorization, String currentPassword, String newPassword)
 			throws Exception {
 		String current = currentPassword == null ? "null" : "\"" + currentPassword + "\"";

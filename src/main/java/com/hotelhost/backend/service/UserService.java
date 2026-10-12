@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.hotelhost.backend.dto.ChangePasswordRequest;
+import com.hotelhost.backend.dto.UpdateProfileRequest;
 import com.hotelhost.backend.dto.UserResponse;
 import com.hotelhost.backend.entity.User;
 import com.hotelhost.backend.exception.ApiException;
@@ -25,6 +26,15 @@ public class UserService {
 	@Transactional(readOnly = true)
 	public UserResponse getCurrentUser(Long userId) {
 		return UserResponse.from(findActiveUser(userId));
+	}
+
+	@Transactional
+	public UserResponse updateProfile(Long userId, UpdateProfileRequest request) {
+		User user = findActiveUser(userId);
+		user.setFirstName(request.firstName().trim());
+		user.setLastName(request.lastName() == null ? "" : request.lastName().trim());
+		user.setPhone(request.phone() == null || request.phone().isBlank() ? null : request.phone().trim());
+		return UserResponse.from(user);
 	}
 
 	@Transactional

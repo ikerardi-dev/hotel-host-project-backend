@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.hotelhost.backend.dto.ChangePasswordRequest;
 import com.hotelhost.backend.dto.CleaningResponse;
+import com.hotelhost.backend.dto.UpdateProfileRequest;
 import com.hotelhost.backend.dto.UserResponse;
 import com.hotelhost.backend.security.CurrentUser;
 import com.hotelhost.backend.service.CleaningService;
@@ -37,6 +38,11 @@ public class MeController {
 	@GetMapping
 	public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
 		return userService.getCurrentUser(userId(jwt));
+	}
+
+	@PutMapping
+	public UserResponse updateProfile(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateProfileRequest request) {
+		return userService.updateProfile(userId(jwt), request);
 	}
 
 	@PutMapping("/password")
