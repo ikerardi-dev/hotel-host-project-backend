@@ -12,7 +12,7 @@ El encargado anota las entradas y salidas de huéspedes, y la app programa y con
 
 | | |
 |---|---|
-| Presentación | [docs/presentacion.html](docs/presentacion.html): descárgala (botón *Download raw file*) y ábrela en Chrome o Edge. `F` pantalla completa y flechas para avanzar |
+| Presentación | [docs/presentacion.pdf](docs/presentacion.pdf) (se ve directamente en GitHub). Versión con animaciones: [docs/presentacion.html](docs/presentacion.html), descárgala y ábrela en Chrome o Edge |
 | Diseño | [Figma](https://www.figma.com/design/meI8zWuhbF2iShiXXA7YWi/Sin-t%C3%ADtulo) (bocetos y pantallas exportadas de Google Stitch) |
 | Planificación | [Jira · backlog y sprints](https://ikerfactoriaf5-1790672970142.atlassian.net/jira/software/projects/SCRUM/boards/1/backlog) |
 | Frontend | [hotel-host-project-frontend](https://github.com/ikerardi-dev/hotel-host-project-frontend) |
