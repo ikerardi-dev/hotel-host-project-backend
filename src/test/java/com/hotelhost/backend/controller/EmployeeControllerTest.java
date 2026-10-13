@@ -1,9 +1,11 @@
 package com.hotelhost.backend.controller;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -23,6 +25,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.hotelhost.backend.entity.Cleaning;
+import com.hotelhost.backend.entity.CleaningStatus;
 import com.hotelhost.backend.entity.User;
 import com.hotelhost.backend.entity.UserRole;
 import com.hotelhost.backend.repository.ApartmentRepository;
@@ -152,6 +155,102 @@ class EmployeeControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$[0].name").value("Legazpi"))
 				.andExpect(jsonPath("$[0].apartmentCount").value(4));
+	}
+
+	@Test
+	void adminSeesEmployeeDetail() throws Exception {
+		Long id = employeeId();
+
+		mockMvc.perform(get("/api/employees/" + id).header(HttpHeaders.AUTHORIZATION, adminToken()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.email").value("limpieza.test@hotelhost.local"));
+	}
+
+	@Test
+	void adminUpdatesEmployeeData() throws Exception {
+		Long id = employeeId();
+
+		updateEmployee(id, "nuevo.email@hotelhost.local")
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.email").value("nuevo.email@hotelhost.local"))
+				.andExpect(jsonPath("$.phone").value("600111222"))
+				.andExpect(jsonPath("$.buildings[0].id").value(buildingId));
+	}
+
+	@Test
+	void updateRejectsEmailOfAnotherUser() throws Exception {
+		updateEmployee(employeeId(), "admin.test@hotelhost.local")
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").value("EMAIL_ALREADY_EXISTS"));
+	}
+
+	@Test
+	void resetPasswordForcesChangeOnNextLogin() throws Exception {
+		Long id = employeeId();
+
+		mockMvc.perform(put("/api/employees/" + id + "/password")
+				.header(HttpHeaders.AUTHORIZATION, adminToken())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"temporaryPassword\": \"Nueva1234\"}"))
+				.andExpect(status().isNoContent());
+
+		login("limpieza.test@hotelhost.local", PASSWORD).andExpect(status().isUnauthorized());
+		login("limpieza.test@hotelhost.local", "Nueva1234")
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.user.mustChangePassword").value(true));
+	}
+
+	@Test
+	void activeEmployeeCannotBeDeleted() throws Exception {
+		deleteEmployee(employeeId())
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").value("EMPLOYEE_ACTIVE"));
+	}
+
+	@Test
+	void deletedEmployeeKeepsNameInCleaningHistory() throws Exception {
+		User employee = userRepository.findByEmailIgnoreCase("limpieza.test@hotelhost.local").orElseThrow();
+		Cleaning done = pendingCleaning(employee, LocalDate.now().minusDays(1));
+		done.setStatus(CleaningStatus.DONE);
+		Long doneId = cleaningRepository.save(done).getId();
+		updateStatus(employee.getId(), false);
+
+		deleteEmployee(employee.getId()).andExpect(status().isNoContent());
+
+		mockMvc.perform(get("/api/employees/" + employee.getId()).header(HttpHeaders.AUTHORIZATION, adminToken()))
+				.andExpect(status().isNotFound());
+		mockMvc.perform(get("/api/cleanings/" + doneId).header(HttpHeaders.AUTHORIZATION, adminToken()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.assignedTo.id").isEmpty())
+				.andExpect(jsonPath("$.assignedTo.name").value("Test Usuario"));
+		login("limpieza.test@hotelhost.local", PASSWORD).andExpect(status().isUnauthorized());
+	}
+
+	private Long employeeId() {
+		return userRepository.findByEmailIgnoreCase("limpieza.test@hotelhost.local").orElseThrow().getId();
+	}
+
+	private ResultActions updateEmployee(Long id, String email) throws Exception {
+		String body = """
+				{
+				  "firstName": "Test",
+				  "lastName": "Usuario Editado",
+				  "dni": "%s",
+				  "phone": "600111222",
+				  "email": "%s",
+				  "buildingIds": [%d],
+				  "hireDate": "2026-10-01",
+				  "notes": null
+				}
+				""".formatted(TEST_DNI, email, buildingId);
+		return mockMvc.perform(put("/api/employees/" + id)
+				.header(HttpHeaders.AUTHORIZATION, adminToken())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body));
+	}
+
+	private ResultActions deleteEmployee(Long id) throws Exception {
+		return mockMvc.perform(delete("/api/employees/" + id).header(HttpHeaders.AUTHORIZATION, adminToken()));
 	}
 
 	private ResultActions createEmployee(String authorization, String email, String dni) throws Exception {

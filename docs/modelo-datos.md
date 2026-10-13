@@ -69,6 +69,7 @@ erDiagram
         BIGINT apartment_id FK
         BIGINT booking_id FK "UK, opcional"
         BIGINT assigned_to FK "opcional"
+        VARCHAR assigned_to_name "nombre si se eliminó al empleado"
         DATE cleaning_date
         TIME start_time
         TIME end_time

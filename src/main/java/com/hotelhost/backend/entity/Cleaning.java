@@ -45,6 +45,10 @@ public class Cleaning {
 	@JoinColumn(name = "assigned_to")
 	private User assignedTo;
 
+	// Nombre de quien la hizo, guardado al eliminar a ese empleado (assignedTo pasa a null)
+	@Column(name = "assigned_to_name")
+	private String assignedToName;
+
 	@Column(name = "cleaning_date")
 	private LocalDate cleaningDate;
 
@@ -112,6 +116,19 @@ public class Cleaning {
 
 	public void setAssignedTo(User assignedTo) {
 		this.assignedTo = assignedTo;
+	}
+
+	public String getAssignedToName() {
+		return assignedToName;
+	}
+
+	// Nombre para mostrar: el del empleado asignado o, si se eliminó, el que quedó guardado
+	public String assigneeDisplayName() {
+		return assignedTo != null ? assignedTo.getFirstName() + " " + assignedTo.getLastName() : assignedToName;
+	}
+
+	public void setAssignedToName(String assignedToName) {
+		this.assignedToName = assignedToName;
 	}
 
 	public LocalDate getCleaningDate() {

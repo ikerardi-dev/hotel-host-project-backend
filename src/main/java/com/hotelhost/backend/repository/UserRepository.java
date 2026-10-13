@@ -20,6 +20,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 	boolean existsByDni(String dni);
 
+	boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
+
+	boolean existsByDniAndIdNot(String dni, Long id);
+
 	List<User> findByRoleOrderByFirstNameAscLastNameAsc(UserRole role);
 
 	Optional<User> findByIdAndRole(Long id, UserRole role);

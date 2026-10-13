@@ -77,4 +77,15 @@ public interface CleaningRepository extends JpaRepository<Cleaning, Long> {
 			  AND c.cleaningDate >= :from
 			""")
 	int unassignPendingFrom(@Param("userId") Long userId, @Param("from") LocalDate from);
+
+	// Al eliminar a un empleado: su historial guarda el nombre y deja de apuntar al usuario; lo pendiente queda sin asignar
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("""
+			UPDATE Cleaning c
+			SET c.assignedToName = CASE WHEN c.status = com.hotelhost.backend.entity.CleaningStatus.PENDING
+			                            THEN NULL ELSE :name END,
+			    c.assignedTo = NULL
+			WHERE c.assignedTo.id = :userId
+			""")
+	int detachFromEmployee(@Param("userId") Long userId, @Param("name") String name);
 }

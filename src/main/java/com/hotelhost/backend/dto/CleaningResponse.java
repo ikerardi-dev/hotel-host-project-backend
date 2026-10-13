@@ -32,6 +32,7 @@ public record CleaningResponse(
 	public record ApartmentSummary(Long id, String code, String buildingName, int capacity, List<BedSummary> beds) {
 	}
 
+	// id null: empleado eliminado, del que solo queda el nombre en el historial
 	public record AssigneeSummary(Long id, String name) {
 	}
 
@@ -45,6 +46,10 @@ public record CleaningResponse(
 				.map(bed -> new BedSummary(bed.getType(), bed.getQuantity()))
 				.toList();
 		User cleaner = cleaning.getAssignedTo();
+		String assigneeName = cleaning.assigneeDisplayName();
+		AssigneeSummary assignee = assigneeName == null
+				? null
+				: new AssigneeSummary(cleaner == null ? null : cleaner.getId(), assigneeName);
 
 		return new CleaningResponse(
 				cleaning.getId(),
@@ -57,7 +62,7 @@ public record CleaningResponse(
 				cleaning.getIncidentNotes(),
 				new ApartmentSummary(apartment.getId(), apartment.getCode(), apartment.getBuilding().getName(),
 						apartment.getCapacity(), beds),
-				cleaner == null ? null : new AssigneeSummary(cleaner.getId(), cleaner.getFirstName() + " " + cleaner.getLastName()),
+				assignee,
 				cleaning.getBooking() == null ? null : cleaning.getBooking().getCheckOut(),
 				nextCheckIn,
 				cleaning.getChecklistItems().stream()

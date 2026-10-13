@@ -77,11 +77,8 @@ public class DashboardService {
 
 	private static TimelineEvent cleaningEvent(Cleaning cleaning) {
 		Apartment apartment = cleaning.getApartment();
-		String assignedTo = cleaning.getAssignedTo() == null
-				? null
-				: cleaning.getAssignedTo().getFirstName() + " " + cleaning.getAssignedTo().getLastName();
 		return new TimelineEvent(EventType.CLEANING, cleaning.getStartTime(), apartment.getId(), apartment.getCode(),
-				apartment.getBuilding().getName(), null, cleaning.getId(), cleaning.getEndTime(), assignedTo,
+				apartment.getBuilding().getName(), null, cleaning.getId(), cleaning.getEndTime(), cleaning.assigneeDisplayName(),
 				cleaning.getStatus());
 	}
 

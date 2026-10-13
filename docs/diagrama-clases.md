@@ -53,6 +53,7 @@ classDiagram
         LocalDateTime startedAt
         LocalDateTime finishedAt
         String incidentNotes
+        String assignedToName
         LocalDateTime createdAt
     }
     class CleaningChecklistItem {
@@ -245,8 +246,12 @@ classDiagram
     }
     class EmployeeService {
         +findAll() List~EmployeeResponse~
+        +findById(Long id) EmployeeResponse
         +create(CreateEmployeeRequest) EmployeeResponse
+        +update(Long id, UpdateEmployeeRequest) EmployeeResponse
+        +resetPassword(Long id, String temporaryPassword) void
         +updateStatus(Long id, boolean active) EmployeeStatusResponse
+        +delete(Long id) void
         +findActiveCleaner(Long id) User
     }
     class CurrentUser {

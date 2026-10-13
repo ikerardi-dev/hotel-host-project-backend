@@ -68,7 +68,9 @@ Es una herramienta interna, así que **no hay registro público**: el registro d
 2. El admin da de alta a cada empleado desde la pantalla "Empleados" (`POST /api/employees`), con sus datos y una **contraseña temporal** que genera el frontend. La contraseña se guarda cifrada con BCrypt.
 3. El empleado inicia sesión (`POST /api/auth/login`) y recibe un **JWT**. Mientras tenga la contraseña temporal, la API solo le deja cambiarla (`PUT /api/me/password`); el resto de rutas responden `403 PASSWORD_CHANGE_REQUIRED`.
 4. Después, cada usuario puede editar su perfil y cambiar su contraseña cuando quiera. Los administradores no pasan nunca por el cambio obligatorio.
-5. El admin puede dar de **baja** a un empleado (`PATCH /api/employees/{id}/status`). La baja es lógica: no puede iniciar sesión, pero se conserva su historial de limpiezas.
+5. Desde la ficha del empleado, el admin puede **corregir sus datos** (`PUT /api/employees/{id}`) y, si olvida la contraseña, darle una **temporal nueva** (`PUT /api/employees/{id}/password`): la anterior deja de valer y en su próximo acceso tendrá que cambiarla otra vez.
+6. El admin puede dar de **baja** a un empleado (`PATCH /api/employees/{id}/status`). La baja es lógica: no puede iniciar sesión, pero se conserva su historial de limpiezas.
+7. Un empleado ya dado de baja se puede **eliminar definitivamente** (`DELETE /api/employees/{id}`). Sus limpiezas hechas conservan su nombre en el historial y las pendientes quedan sin asignar.
 
 ---
 
@@ -208,7 +210,11 @@ Todas las rutas empiezan por `/api` y, salvo el login, necesitan la cabecera `Au
 | PATCH | `/cleanings/{id}/incident` | Admin o empleado asignado | Guardar la incidencia |
 | GET | `/employees` | Admin | Empleados de limpieza |
 | POST | `/employees` | Admin | Alta de empleado con contraseña temporal |
+| GET | `/employees/{id}` | Admin | Ficha de un empleado |
+| PUT | `/employees/{id}` | Admin | Editar sus datos |
+| PUT | `/employees/{id}/password` | Admin | Nueva contraseña temporal (tendrá que cambiarla al entrar) |
 | PATCH | `/employees/{id}/status` | Admin | Dar de baja o reactivar |
+| DELETE | `/employees/{id}` | Admin | Eliminar definitivamente (solo si está dado de baja) |
 
 ---
 
@@ -234,24 +240,25 @@ Esquema gestionado con **Flyway** en `src/main/resources/db/migration`:
 | `V1__init.sql` | Tablas, claves foráneas, restricciones e índices |
 | `V2__seed_buildings_apartments.sql` | 3 edificios, 19 apartamentos y sus camas |
 | `V3__admins_without_password_change.sql` | Los administradores no pasan por el cambio obligatorio de contraseña |
+| `V4__cleaning_assignee_name.sql` | Nombre del empleado en la limpieza, para conservarlo en el historial si se elimina |
 
 Diagrama entidad-relación en [docs/modelo-datos.md](docs/modelo-datos.md) (GitHub lo dibuja automáticamente).
 
 **Reglas importantes:**
-- Las reservas y las limpiezas **no se borran**, se cancelan. Los empleados se dan de baja.
+- Las reservas y las limpiezas **no se borran**, se cancelan. Los empleados se dan de baja y, una vez de baja, el admin puede eliminarlos: su historial de limpiezas conserva el nombre.
 - **No se permiten reservas solapadas** en un mismo apartamento. Se comprueba en una transacción que **bloquea el apartamento** (`SELECT … FOR UPDATE`), así que dos guardados simultáneos no pueden crear duplicados. La entrada sí puede coincidir con el día de salida anterior.
-- Una migración ya aplicada **no se edita nunca**: los cambios van en una nueva (`V4__…`).
+- Una migración ya aplicada **no se edita nunca**: los cambios van en una nueva (`V5__…`).
 
 ---
 
 ## Tests
 
-**107 tests** de dos tipos:
+**117 tests** de dos tipos:
 
 | Tipo | Cuántos | Qué prueban | Cómo |
 |---|---|---|---|
-| **Unitarios** (`src/test/.../service`) | 29 | La lógica de negocio de cada servicio, aislada | JUnit + **Mockito**: los repositorios son *mocks*, sin Spring ni base de datos. Tardan milisegundos |
-| **Integración y capa web** (`controller`, `config`, `exception`) | 78 | Cada endpoint de principio a fin: HTTP, seguridad, validación, servicio y MySQL | `@SpringBootTest` + MockMvc contra MySQL real. Cada test **deshace sus datos al terminar** (`@Transactional`) |
+| **Unitarios** (`src/test/.../service`) | 33 | La lógica de negocio de cada servicio, aislada | JUnit + **Mockito**: los repositorios son *mocks*, sin Spring ni base de datos. Tardan milisegundos |
+| **Integración y capa web** (`controller`, `config`, `exception`) | 84 | Cada endpoint de principio a fin: HTTP, seguridad, validación, servicio y MySQL | `@SpringBootTest` + MockMvc contra MySQL real, en una **base de datos propia para tests** (`<DB_NAME>_test`). Cada test **deshace sus datos al terminar** (`@Transactional`) |
 
 ```bash
 docker compose up -d     # los tests de integración necesitan MySQL
@@ -259,8 +266,15 @@ docker compose up -d     # los tests de integración necesitan MySQL
 ./mvnw test -Dtest=*ServiceTest   # solo los unitarios (no necesitan MySQL)
 ```
 
+Los tests se lanzan con el perfil `test` (`src/test/resources/application-test.yaml`), que usa la base de datos `<DB_NAME>_test`: así tus datos de desarrollo no afectan a los tests ni al revés. Docker la crea sola la primera vez que arranca MySQL (`docker/mysql-init`). Si tu contenedor ya existía de antes, créala una vez con:
+
+```bash
+docker exec -i hotel-host-mysql sh < docker/mysql-init/01-test-database.sh
+```
+
 Cubren, entre otros:
 - login, cuenta dada de baja, roles y contraseña temporal;
+- ficha del empleado: editar datos, nueva contraseña temporal y eliminación conservando el historial;
 - fechas, capacidad y solapamiento de reservas (incluidos los casos límite), y la limpieza automática;
 - el flujo de estados de las limpiezas, la checklist y los permisos por empleado;
 - editar y cancelar reservas (la limpieza pendiente se mueve o se cancela con ellas);

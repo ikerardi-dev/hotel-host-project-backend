@@ -46,7 +46,7 @@ public record BookingResponse(
 					cleaning.getEndTime(),
 					cleaning.getStatus(),
 					cleaner == null ? null : cleaner.getId(),
-					cleaner == null ? null : cleaner.getFirstName() + " " + cleaner.getLastName());
+					cleaning.assigneeDisplayName());
 		}
 	}
 
