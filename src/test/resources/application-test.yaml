@@ -1,0 +1,5 @@
+# Perfil de los tests: misma configuración, pero en una base de datos aparte (<DB_NAME>_test),
+# para que los datos de la app no afecten a los tests ni los tests a los datos.
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}_test

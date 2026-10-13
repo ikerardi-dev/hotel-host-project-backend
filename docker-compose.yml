@@ -12,6 +12,8 @@ services:
       - "${DB_PORT}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      # Scripts de la primera arrancada: crea también la base de datos de los tests
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
 
 volumes:
   mysql-data:
