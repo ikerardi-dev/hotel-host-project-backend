@@ -226,6 +226,7 @@ Todas las rutas empiezan por `/api` y, salvo el login, necesitan la cabecera `Au
 - **El personal de limpieza no recibe datos personales de los huéspedes**, solo las horas de entrada y salida.
 - **Contraseña temporal:** mientras el empleado no la cambie, cualquier otra petición devuelve `403 PASSWORD_CHANGE_REQUIRED`.
 - **Baja lógica:** un empleado dado de baja no puede iniciar sesión, y sus limpiezas pendientes se quedan sin asignar.
+- **Sesiones al día:** en cada petición se comprueba que el usuario sigue existiendo y activo. Si el admin lo da de baja o lo elimina, su sesión abierta deja de valer al momento (`401`), sin esperar a que caduque el token.
 - **CORS** limitado a los orígenes de `CORS_ALLOWED_ORIGINS`.
 - **Secretos** solo en variables de entorno.
 
@@ -253,12 +254,12 @@ Diagrama entidad-relación en [docs/modelo-datos.md](docs/modelo-datos.md) (GitH
 
 ## Tests
 
-**117 tests** de dos tipos:
+**118 tests** de dos tipos:
 
 | Tipo | Cuántos | Qué prueban | Cómo |
 |---|---|---|---|
 | **Unitarios** (`src/test/.../service`) | 33 | La lógica de negocio de cada servicio, aislada | JUnit + **Mockito**: los repositorios son *mocks*, sin Spring ni base de datos. Tardan milisegundos |
-| **Integración y capa web** (`controller`, `config`, `exception`) | 84 | Cada endpoint de principio a fin: HTTP, seguridad, validación, servicio y MySQL | `@SpringBootTest` + MockMvc contra MySQL real, en una **base de datos propia para tests** (`<DB_NAME>_test`). Cada test **deshace sus datos al terminar** (`@Transactional`) |
+| **Integración y capa web** (`controller`, `config`, `exception`) | 85 | Cada endpoint de principio a fin: HTTP, seguridad, validación, servicio y MySQL | `@SpringBootTest` + MockMvc contra MySQL real, en una **base de datos propia para tests** (`<DB_NAME>_test`). Cada test **deshace sus datos al terminar** (`@Transactional`) |
 
 ```bash
 docker compose up -d     # los tests de integración necesitan MySQL

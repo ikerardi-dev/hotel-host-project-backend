@@ -131,6 +131,18 @@ class EmployeeControllerTest {
 	}
 
 	@Test
+	void openSessionStopsWorkingWhenEmployeeIsDeactivated() throws Exception {
+		String employeeToken = bearer("limpieza.test@hotelhost.local");
+		mockMvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, employeeToken)).andExpect(status().isOk());
+
+		updateStatus(employeeId(), false);
+
+		mockMvc.perform(get("/api/me").header(HttpHeaders.AUTHORIZATION, employeeToken))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+	}
+
+	@Test
 	void reactivatedEmployeeCanLogInAgain() throws Exception {
 		Long id = userRepository.findByEmailIgnoreCase("limpieza.test@hotelhost.local").orElseThrow().getId();
 		updateStatus(id, false);
