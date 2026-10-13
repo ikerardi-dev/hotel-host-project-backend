@@ -8,9 +8,22 @@ El encargado anota las entradas y salidas de huéspedes, y la app programa y con
 
 ---
 
+## Enlaces del proyecto
+
+| | |
+|---|---|
+| Presentación | [docs/presentacion.html](docs/presentacion.html): descárgala (botón *Download raw file*) y ábrela en Chrome o Edge. `F` pantalla completa y flechas para avanzar |
+| Diseño | [Figma](https://www.figma.com/design/meI8zWuhbF2iShiXXA7YWi/Sin-t%C3%ADtulo) (bocetos y pantallas exportadas de Google Stitch) |
+| Planificación | [Jira · backlog y sprints](https://ikerfactoriaf5-1790672970142.atlassian.net/jira/software/projects/SCRUM/boards/1/backlog) |
+| Frontend | [hotel-host-project-frontend](https://github.com/ikerardi-dev/hotel-host-project-frontend) |
+| Backend | [hotel-host-project-backend](https://github.com/ikerardi-dev/hotel-host-project-backend) |
+
+---
+
 ## Índice
 
 - [Funcionalidades](#funcionalidades)
+- [Registro y acceso](#registro-y-acceso)
 - [Tecnologías](#tecnologías)
 - [Arquitectura](#arquitectura)
 - [Puesta en marcha en local](#puesta-en-marcha-en-local)
@@ -44,6 +57,18 @@ Dos roles con vistas distintas. **No hay registro público**: solo el administra
 **Todos los usuarios:** perfil editable y cambio de contraseña.
 
 > Las reservas son una **anotación manual** para saber cuándo hay que limpiar. No hay conexión con Booking, Airbnb ni otras plataformas: el canal es solo informativo.
+
+---
+
+## Registro y acceso
+
+Es una herramienta interna, así que **no hay registro público**: el registro de usuarios lo hace el administrador.
+
+1. Al arrancar, si no existe ningún administrador, la aplicación crea el **administrador inicial** con `ADMIN_EMAIL` y `ADMIN_PASSWORD` (`AdminInitializer`).
+2. El admin da de alta a cada empleado desde la pantalla "Empleados" (`POST /api/employees`), con sus datos y una **contraseña temporal** que genera el frontend. La contraseña se guarda cifrada con BCrypt.
+3. El empleado inicia sesión (`POST /api/auth/login`) y recibe un **JWT**. Mientras tenga la contraseña temporal, la API solo le deja cambiarla (`PUT /api/me/password`); el resto de rutas responden `403 PASSWORD_CHANGE_REQUIRED`.
+4. Después, cada usuario puede editar su perfil y cambiar su contraseña cuando quiera. Los administradores no pasan nunca por el cambio obligatorio.
+5. El admin puede dar de **baja** a un empleado (`PATCH /api/employees/{id}/status`). La baja es lógica: no puede iniciar sesión, pero se conserva su historial de limpiezas.
 
 ---
 
