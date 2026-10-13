@@ -57,7 +57,7 @@ public interface CleaningRepository extends JpaRepository<Cleaning, Long> {
 			  AND (:status IS NULL OR c.status = :status)
 			  AND (:buildingId IS NULL OR b.id = :buildingId)
 			  AND (:employeeId IS NULL OR u.id = :employeeId)
-			  AND (:unassigned = FALSE OR u IS NULL)
+			  AND (:unassigned = FALSE OR (u IS NULL AND c.assignedToName IS NULL))
 			ORDER BY c.cleaningDate, c.startTime
 			""")
 	List<Cleaning> search(

@@ -213,7 +213,7 @@ Fuera de estas capas:
 
 - **`security`:**
   - `JwtService` firma el token, con los claims `sub`, `role` y `exp`.
-  - `PasswordChangeRequiredFilter` bloquea la API a los empleados que aún tienen la contraseña temporal.
+  - `PasswordChangeRequiredFilter` comprueba en cada petición el estado del usuario: corta la sesión de quien se ha eliminado o dado de baja (401) y bloquea la API a los empleados que aún tienen la contraseña temporal (403).
   - `CurrentUser` es el usuario de la petición, sacado del JWT.
 - **`config`:**
   - `SecurityConfig` define las rutas públicas, los permisos por rol y el JWT.

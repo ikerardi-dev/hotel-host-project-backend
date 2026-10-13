@@ -235,6 +235,13 @@ class EmployeeControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.assignedTo.id").isEmpty())
 				.andExpect(jsonPath("$.assignedTo.name").value("Test Usuario"));
+		// Una limpieza hecha por alguien eliminado no es una limpieza "sin asignar"
+		String yesterday = LocalDate.now().minusDays(1).toString();
+		mockMvc.perform(get("/api/cleanings")
+				.param("from", yesterday).param("to", yesterday).param("unassigned", "true")
+				.header(HttpHeaders.AUTHORIZATION, adminToken()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[?(@.id == " + doneId + ")]").isEmpty());
 		login("limpieza.test@hotelhost.local", PASSWORD).andExpect(status().isUnauthorized());
 	}
 

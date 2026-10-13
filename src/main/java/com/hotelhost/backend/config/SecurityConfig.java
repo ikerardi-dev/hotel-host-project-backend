@@ -69,7 +69,7 @@ public class SecurityConfig {
 				.exceptionHandling(exceptions -> exceptions
 						.authenticationEntryPoint(unauthorized)
 						.accessDeniedHandler(forbidden))
-				// Después de validar el token: bloquea a quien aún tiene la contraseña temporal
+				// Después de validar el token: corta la sesión de usuarios eliminados o de baja y bloquea a quien aún tiene la contraseña temporal
 				.addFilterAfter(new PasswordChangeRequiredFilter(userRepository), BearerTokenAuthenticationFilter.class);
 
 		return http.build();
